@@ -9,14 +9,14 @@ import (
 )
 
 type GResult struct {
-	Id  string
-	Res interface{}
+	id  string
+	res interface{}
 }
 
 type GTask struct {
-	Id   string
-	Args []interface{}
-	Task func(args ...interface{}) interface{}
+	id   string
+	args []interface{}
+	task func(args ...interface{}) interface{}
 }
 
 type GPool struct {
@@ -41,7 +41,7 @@ func NewGPool(num int) *GPool {
 func (pool *GPool) AddTask(task func(...interface{}) interface{}, args ...interface{}) {
 	id := uuid.NewV4().String()
 	fmt.Printf("add %v start\n", id)
-	pool.taskQueue <- GTask{Id: id, Task: task, Args: args}
+	pool.taskQueue <- GTask{id: id, task: task, args: args}
 	fmt.Printf("add %v stop\n", id)
 }
 
@@ -55,9 +55,9 @@ func (pool *GPool) Start() {
 			}()
 
 			for task := range pool.taskQueue {
-				fmt.Printf("take out %v\n", task.Id)
-				res := task.Task(task.Args...)
-				pool.resultQueue <- GResult{Id: task.Id, Res: res}
+				fmt.Printf("take out %v\n", task.id)
+				res := task.task(task.args...)
+				pool.resultQueue <- GResult{id: task.id, res: res}
 			}
 		}()
 	}
@@ -72,7 +72,7 @@ func (pool *GPool) Stop() {
 func (pool *GPool) GetResult() {
 	go func() {
 		for result := range pool.resultQueue {
-			fmt.Printf("TaskId: %v\tTaskResult: %v\n", result.Id, result.Res)
+			fmt.Printf("Taskid: %v\tTaskresult: %v\n", result.id, result.res)
 			atomic.AddInt32(&pool.totalTask, 1)
 		}
 	}()
