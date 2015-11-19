@@ -24,7 +24,7 @@ func TestGPool(t *testing.T) {
 	}
 	pool.Stop()
 	time.Sleep(time.Second)
-	if pool.TotalTask != 1000 {
+	if pool.totalTask != 1000 {
 		t.Error("Task Lost!")
 	}
 }
