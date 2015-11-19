@@ -1,2 +1,2 @@
 # bli-go
-experience something interesting by golang
+a simple goroutine pool implementation
