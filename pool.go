@@ -22,6 +22,7 @@ type GTask struct {
 
 type GPool struct {
 	GNum        int
+	TotalTask   int32
 	TaskQueue   chan GTask
 	ResultQueue chan GResult
 	wg          sync.WaitGroup
@@ -72,13 +73,11 @@ func (pool *GPool) Stop() {
 	close(pool.ResultQueue)
 }
 
-var cnt int32
-
 func (pool *GPool) GetResult() {
 	go func() {
 		for result := range pool.ResultQueue {
 			fmt.Printf("TaskId: %v\tTaskResult: %v\n", result.Id, result.Res)
-			atomic.AddInt32(&cnt, 1)
+			atomic.AddInt32(&pool.TotalTask, 1)
 		}
 	}()
 }
