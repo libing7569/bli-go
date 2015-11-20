@@ -21,6 +21,7 @@ type GTask struct {
 }
 
 type GPool struct {
+	graceful    chan byte
 	gSugNum     int32
 	gCurNum     int32
 	totalTask   int32
@@ -42,10 +43,11 @@ const (
 func NewGPool(gSugNum int32) *GPool {
 	taskQueue := make(chan GTask, TASK_QUEUE_MAX_SIZE)
 	resultQueue := make(chan GResult, RESULT_QUEUE_MAX_SIZE)
+	gracechan := make(chan byte)
 	if gSugNum < MIN_GOROUTINE_NUM {
 		gSugNum = MIN_GOROUTINE_NUM
 	}
-	return &GPool{gSugNum: gSugNum, taskQueue: taskQueue, resultQueue: resultQueue}
+	return &GPool{gSugNum: gSugNum, taskQueue: taskQueue, resultQueue: resultQueue, graceful: gracechan}
 }
 
 func (pool *GPool) AddTask(task func(...interface{}) interface{}, args ...interface{}) {
@@ -79,10 +81,6 @@ func (pool *GPool) scale() {
 					pool.desc(pool.gCurNum / 2)
 					scale = 0
 				}
-
-				//if scale < -30 {
-				//pool.wg.Add(-1 * int(pool.gCurNum))
-				//}
 
 			default:
 				fmt.Println("no scale!")
@@ -153,14 +151,16 @@ func (pool *GPool) Stop() {
 	pool.wg.Wait()
 	close(pool.resultQueue)
 	fmt.Println("close resultQueue")
+	<-pool.graceful
 }
 
-func (pool *GPool) GetResult() {
+func (pool *GPool) GetResult(f func(res GResult)) {
 	go func() {
-		for _ = range pool.resultQueue {
-			//fmt.Printf("Taskid: %v\tTaskresult: %v\n", result.id, result.res)
+		for r := range pool.resultQueue {
+			f(r)
 			atomic.AddInt32(&pool.totalTask, 1)
 		}
+		pool.graceful <- 1
 	}()
 }
 
