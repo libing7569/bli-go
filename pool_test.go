@@ -14,17 +14,19 @@ func TestGPool(t *testing.T) {
 	pool.GetResult()
 	//pool.Heatbeat()
 
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < 100000; i++ {
 		pool.AddTask(func(args ...interface{}) interface{} {
-			fmt.Println("Add TaskId")
+			//fmt.Println("Add TaskId")
 			//fmt.Println(reflect.TypeOf(args))
-			fmt.Printf("%#v\n", args)
+			//fmt.Printf("%#v\n", args)
+			time.Sleep(100 * time.Millisecond)
 			return args
 		}, i)
 	}
 	pool.Stop()
 	time.Sleep(time.Second)
-	if pool.totalTask != 1000 {
+	fmt.Printf("Processed total task number: %v\n", pool.totalTask)
+	if pool.totalTask != 100000 {
 		t.Error("Task Lost!")
 	}
 }
