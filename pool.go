@@ -1,7 +1,8 @@
 package pool
 
 import (
-	"fmt"
+	"log"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -34,11 +35,13 @@ type GPool struct {
 const (
 	TASK_QUEUE_MAX_SIZE   = 100000
 	RESULT_QUEUE_MAX_SIZE = 2
-	MAX_GOROUTINE_NUM     = 60
+	MAX_GOROUTINE_NUM     = 1024
 	MIN_GOROUTINE_NUM     = 5
 	MONITOR_INTERVAL      = 1
 	SCALE_CHECK_MAX       = 5
 )
+
+var logger = log.New(os.Stdout, "debug: ", log.LstdFlags|log.Lshortfile)
 
 func NewGPool(gSugNum int32) *GPool {
 	taskQueue := make(chan GTask, TASK_QUEUE_MAX_SIZE)
@@ -52,9 +55,9 @@ func NewGPool(gSugNum int32) *GPool {
 
 func (pool *GPool) AddTask(task func(...interface{}) interface{}, args ...interface{}) {
 	id := uuid.NewV4().String()
-	//fmt.Printf("add %v start\n", id)
+	//logger.Printf("add %v start\n", id)
 	pool.taskQueue <- GTask{id: id, task: task, args: args}
-	//fmt.Printf("add %v stop\n", id)
+	//logger.Printf("add %v stop\n", id)
 }
 
 func (pool *GPool) scale() {
@@ -64,34 +67,36 @@ func (pool *GPool) scale() {
 	for {
 		select {
 		case <-timer.C:
-			fmt.Printf("gCurNum: %v\ttotal tasks: %v\n", pool.gCurNum, len(pool.taskQueue))
+			logger.Printf("gCurNum: %v\ttotal tasks: %v\n", pool.gCurNum, len(pool.taskQueue))
 			switch {
 			case len(pool.taskQueue) >= int(2*pool.gCurNum):
-				scale++
-				if pool.gCurNum*2 <= MAX_GOROUTINE_NUM && scale > SCALE_CHECK_MAX {
+				if pool.gCurNum*2 <= MAX_GOROUTINE_NUM && scale >= SCALE_CHECK_MAX {
 					//pool.gCurNum *= 2
 					pool.incr(pool.gCurNum)
 					scale = 0
+				} else if scale < SCALE_CHECK_MAX {
+					scale++
 				}
 
 			case len(pool.taskQueue) <= int(pool.gCurNum/2):
-				scale--
-				if pool.gCurNum/2 >= MIN_GOROUTINE_NUM && scale < -1*SCALE_CHECK_MAX {
-					fmt.Printf("desc action - gNum: %v\n", pool.gCurNum)
+				if pool.gCurNum/2 >= MIN_GOROUTINE_NUM && scale <= -1*SCALE_CHECK_MAX {
+					logger.Printf("desc action - gNum: %v\n", pool.gCurNum)
 					pool.desc(pool.gCurNum / 2)
 					scale = 0
+				} else if scale > -1*SCALE_CHECK_MAX {
+					scale--
 				}
 
 			default:
-				fmt.Println("no scale!")
+				logger.Println("no scale!")
 			}
 		}
-		fmt.Printf("pool Goroutine num: %v\tscale: %v\n", pool.gCurNum, scale)
+		logger.Printf("pool Goroutine num: %v\tscale: %v\n", pool.gCurNum, scale)
 	}
 }
 
 func (pool *GPool) desc(num int32) {
-	fmt.Printf("desc info - num: %v\t gchansLen: %v\n", num, len(pool.gchans))
+	logger.Printf("desc info - num: %v\t gchansLen: %v\n", num, len(pool.gchans))
 	if int(num) > len(pool.gchans) {
 		return
 	}
@@ -103,16 +108,16 @@ func (pool *GPool) desc(num int32) {
 
 func (pool *GPool) incr(num int32) {
 	for i := 0; i < int(num); i++ {
-		//fmt.Printf("!add %v goroutine\n", i)
+		//logger.Printf("!add %v goroutine\n", i)
 		ch := make(chan byte)
 		pool.gchans = append(pool.gchans, ch)
 		//id := uuid.NewV4().String()
 		pool.wg.Add(1)
 		go func(mych <-chan byte) {
 			atomic.AddInt32(&(pool.gCurNum), 1)
-			//fmt.Printf("the goroutine %v\n", mych)
+			//logger.Printf("the goroutine %v\n", mych)
 			defer func() {
-				fmt.Println("closed")
+				logger.Println("closed")
 				atomic.AddInt32(&pool.gCurNum, -1)
 				pool.wg.Done()
 			}()
@@ -130,12 +135,12 @@ func (pool *GPool) incr(num int32) {
 				case cmd := <-mych:
 					switch cmd {
 					case 1:
-						fmt.Println("receive stop cmd!")
+						logger.Println("receive stop cmd!")
 						break l
 					}
 				}
 			}
-			fmt.Println("goroutine end!")
+			logger.Println("goroutine end!")
 		}(ch)
 	}
 }
@@ -147,10 +152,10 @@ func (pool *GPool) Start() {
 
 func (pool *GPool) Stop() {
 	close(pool.taskQueue)
-	fmt.Println("close taskQueue")
+	logger.Println("close taskQueue")
 	pool.wg.Wait()
 	close(pool.resultQueue)
-	fmt.Println("close resultQueue")
+	logger.Println("close resultQueue")
 	<-pool.graceful
 }
 
@@ -168,7 +173,7 @@ func (pool *GPool) Heatbeat() {
 	go func() {
 		for {
 			time.Sleep(1 * time.Second)
-			fmt.Printf("gCurNum: %v, taskQueue length: %v, resultQueue length: %v\n", pool.gCurNum, len(pool.taskQueue), len(pool.resultQueue))
+			logger.Printf("gCurNum: %v, taskQueue length: %v, resultQueue length: %v\n", pool.gCurNum, len(pool.taskQueue), len(pool.resultQueue))
 		}
 	}()
 }
