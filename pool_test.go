@@ -33,10 +33,20 @@ func TestGPool(t *testing.T) {
 	//}, i)
 	//}
 	time.Sleep(90 * time.Second)
-	//pool.Stop()
 
+	for i := 0; i < 1000000; i++ {
+		pool.AddTask(func(args ...interface{}) interface{} {
+			//fmt.Println("Task execute!")
+			//fmt.Println(reflect.TypeOf(args))
+			//fmt.Printf("%#v\n", args)
+			time.Sleep(10 * time.Millisecond)
+			return args
+		}, i)
+	}
+
+	pool.Stop()
 	t.Logf("Processed total task number: %v\n", pool.totalTask)
-	if pool.totalTask != 1000000 {
+	if pool.totalTask != 2000000 {
 		t.Error("Task Lost!")
 	}
 }
