@@ -1,2 +1,2 @@
 # bli-go
-a simple goroutine pool implementation!
+a simple goroutine pool implementation.
