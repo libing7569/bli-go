@@ -1,7 +1,6 @@
-package pool_test
+package pool
 
 import (
-	. "pool"
 	"testing"
 	"time"
 )
